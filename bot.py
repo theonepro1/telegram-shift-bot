@@ -45,6 +45,11 @@ operators = ["Ардина", "Назгул", "Жазира"]
 barmen = ["Дастан", "Магжан", "Мейржан"]
 
 # Клавиатуры
+confirm_keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(
+    KeyboardButton("✅ Подтверждаю"),
+    KeyboardButton("❌ Отмена")
+)
+
 operator_keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
 for op in operators:
     operator_keyboard.add(KeyboardButton(op))
@@ -53,72 +58,91 @@ barmen_keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
 for br in barmen:
     barmen_keyboard.add(KeyboardButton(br))
 
-confirm_keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(
-    KeyboardButton("✅ Подтверждаю"),
-    KeyboardButton("❌ Отмена")
-)
-
-# Хранилище состояний пользователей
-user_states = {}
-
-def set_state(user_id, state):
-    user_states[user_id] = state
-
-def get_state(user_id):
-    return user_states.get(user_id)
+numeric_keyboard = types.ReplyKeyboardRemove()
 
 @dp.message_handler(commands=['start'])
 async def start(message: types.Message):
     today, shift = get_current_shift()
     await message.answer(f"Здравствуйте! Сейчас идет смена ({today} - {shift}).\nВыберите ваше имя:", reply_markup=operator_keyboard)
-    set_state(message.from_user.id, "choose_operator")
 
-@dp.message_handler(lambda message: get_state(message.from_user.id) == "choose_operator" and message.text in operators)
+@dp.message_handler(lambda message: message.text in operators)
 async def operator_selected(message: types.Message):
-    set_state(message.from_user.id, "enter_pc_income")
-    await message.answer(f"Оператор {message.text}, введите поступления по ПК:", reply_markup=types.ReplyKeyboardRemove())
+    data["operator"] = message.text
+    save_data(data)
+    await message.answer(f"🖥️ Введите поступления по ПК:", reply_markup=numeric_keyboard)
 
-data_store = {}
+@dp.message_handler(lambda message: message.text.isdigit(), state=None)
+async def pc_income(message: types.Message):
+    data["pc_income"] = int(message.text)
+    save_data(data)
+    await message.answer(f"🎮 Введите поступления по SimRacing:")
 
-@dp.message_handler(lambda message: get_state(message.from_user.id) == "enter_pc_income" and message.text.isdigit())
-async def enter_pc_income(message: types.Message):
-    data_store[message.from_user.id] = {"pc_income": int(message.text)}
-    set_state(message.from_user.id, "enter_simracing_income")
-    await message.answer("Введите поступления по SimRacing:")
+@dp.message_handler(lambda message: message.text.isdigit())
+async def simracing_income(message: types.Message):
+    data["simracing_income"] = int(message.text)
+    save_data(data)
+    await message.answer(f"🕹️ Введите поступления по PlayStation:")
 
-@dp.message_handler(lambda message: get_state(message.from_user.id) == "enter_simracing_income" and message.text.isdigit())
-async def enter_simracing_income(message: types.Message):
-    data_store[message.from_user.id]["simracing_income"] = int(message.text)
-    set_state(message.from_user.id, "enter_playstation_income")
-    await message.answer("Введите поступления по PlayStation:")
+@dp.message_handler(lambda message: message.text.isdigit())
+async def playstation_income(message: types.Message):
+    data["playstation_income"] = int(message.text)
+    save_data(data)
+    await message.answer(f"💰 Введите остаток денег в кассе (до 3000 тенге):")
 
-@dp.message_handler(lambda message: get_state(message.from_user.id) == "enter_playstation_income" and message.text.isdigit())
-async def enter_playstation_income(message: types.Message):
-    data_store[message.from_user.id]["playstation_income"] = int(message.text)
-    set_state(message.from_user.id, "enter_cash_left")
-    await message.answer("Введите остаток в кассе (до 3000 тенге):")
+@dp.message_handler(lambda message: message.text.isdigit())
+async def cash_left(message: types.Message):
+    data["cash_left"] = int(message.text)
+    save_data(data)
+    await message.answer(f"✅ Подтвердите данные:\n"
+                         f"🖥️ ПК: {data['pc_income']} тенге\n"
+                         f"🎮 SimRacing: {data['simracing_income']} тенге\n"
+                         f"🕹️ PlayStation: {data['playstation_income']} тенге\n"
+                         f"💰 Остаток в кассе: {data['cash_left']} тенге", reply_markup=confirm_keyboard)
 
-@dp.message_handler(lambda message: get_state(message.from_user.id) == "enter_cash_left" and message.text.isdigit())
-async def enter_cash_left(message: types.Message):
-    data_store[message.from_user.id]["cash_left"] = int(message.text)
-    set_state(message.from_user.id, "confirm_shift")
-    await message.answer(f"Проверьте введенные данные:\n\n"
-                         f"Поступления ПК: {data_store[message.from_user.id]['pc_income']}\n"
-                         f"Поступления SimRacing: {data_store[message.from_user.id]['simracing_income']}\n"
-                         f"Поступления PlayStation: {data_store[message.from_user.id]['playstation_income']}\n"
-                         f"Остаток в кассе: {data_store[message.from_user.id]['cash_left']}\n"
-                         f"\nПодтвердите сдачу смены:", reply_markup=confirm_keyboard)
+@dp.message_handler(lambda message: message.text == "✅ Подтверждаю")
+async def confirm_operator(message: types.Message):
+    await message.answer(f"📢 Теперь очередь бармена! Выберите ваше имя:", reply_markup=barmen_keyboard)
 
-@dp.message_handler(lambda message: get_state(message.from_user.id) == "confirm_shift" and message.text == "✅ Подтверждаю")
-async def confirm_shift(message: types.Message):
+@dp.message_handler(lambda message: message.text in barmen)
+async def barmen_selected(message: types.Message):
+    data["barmen"] = message.text
+    save_data(data)
+    await message.answer(f"🍹 Введите поступления по бару:", reply_markup=numeric_keyboard)
+
+@dp.message_handler(lambda message: message.text.isdigit())
+async def bar_income(message: types.Message):
+    data["bar_income"] = int(message.text)
+    save_data(data)
+    await message.answer(f"🥤 Введите остаток напитков (шт.):")
+
+@dp.message_handler(lambda message: message.text.isdigit())
+async def drinks_left(message: types.Message):
+    data["drinks_left"] = int(message.text)
+    save_data(data)
+    await message.answer(f"🍔 Введите остаток еды (шт.):")
+
+@dp.message_handler(lambda message: message.text.isdigit())
+async def food_left(message: types.Message):
+    data["food_left"] = int(message.text)
+    save_data(data)
+    await message.answer(f"💰 Введите остаток денег в кассе (до 3000 тенге):")
+
+@dp.message_handler(lambda message: message.text.isdigit())
+async def bar_cash_left(message: types.Message):
+    data["bar_cash_left"] = int(message.text)
+    save_data(data)
+    await message.answer(f"✅ Подтвердите данные:\n"
+                         f"🍹 Бар: {data['bar_income']} тенге\n"
+                         f"🥤 Напитки: {data['drinks_left']} шт.\n"
+                         f"🍔 Еда: {data['food_left']} шт.\n"
+                         f"💰 Остаток в кассе: {data['bar_cash_left']} тенге", reply_markup=confirm_keyboard)
+
+@dp.message_handler(lambda message: message.text == "✅ Подтверждаю")
+async def confirm_barmen(message: types.Message):
     today, shift = get_current_shift()
     next_day, next_shift = update_shift()
-    await message.answer(f"✅ Смена ({today} - {shift}) ЗАКРЫЛАСЬ.\n🎉 Открылась смена ({next_day} - {next_shift}).")
-    await message.answer("Бармен, подтвердите остатки напитков:", reply_markup=barmen_keyboard)
-
-@dp.message_handler(lambda message: get_state(message.from_user.id) == "confirm_shift" and message.text == "❌ Отмена")
-async def cancel_shift(message: types.Message):
-    await message.answer("Отмена подтверждения смены.")
+    await message.answer(f"🎉 Кутты болсын! Смена ({today} - {shift}) ЗАКРЫЛАСЬ.\n"
+                         f"📢 Открылась смена ({next_day} - {next_shift}).")
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
