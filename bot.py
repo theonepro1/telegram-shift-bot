@@ -15,7 +15,9 @@ dp = Dispatcher(bot)
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
+            if isinstance(data, dict): 
+                return data
     return {}
 
 def save_data(data):
@@ -67,7 +69,10 @@ async def start(message: types.Message):
 
 @dp.message_handler(lambda message: message.text in operators)
 async def operator_selected(message: types.Message):
+    if isinstance(data, dict):
     data["operator"] = message.text
+else:
+    data = {"operator": message.text}
     save_data(data)
     await message.answer(f"🖥️ Введите поступления по ПК:", reply_markup=numeric_keyboard)
 
