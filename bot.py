@@ -41,8 +41,8 @@ def update_shift():
     return today, next_shift
 
 # Операторы и бармены (для выбора)
-operators = ["Оператор 1", "Оператор 2", "Оператор 3"]
-barmen = ["Бармен 1", "Бармен 2"]
+operators = ["Ардина", "Назгул", "Жазира"]
+barmen = ["Дастан", "Магжан", "Мейржан",]
 
 # Клавиатуры
 confirm_keyboard = ReplyKeyboardMarkup(resize_keyboard=True).add(
@@ -71,7 +71,7 @@ async def operator_selected(message: types.Message):
 async def confirm_shift(message: types.Message):
     today, shift = get_current_shift()
     next_day, next_shift = update_shift()
-    await message.answer(f"ВСЁ, СМЕНА ({today} - {shift}) ЗАКРЫЛАСЬ.\nОТКРЫЛАСЬ СМЕНА ({next_day} - {next_shift}).")
+    await message.answer(f"Кутты болсын :-0, смена ({today} - {shift}) ЗАКРЫЛАСЬ.\nОткрылась смена ({next_day} - {next_shift}).")
     await message.answer("Бармен, подтвердите остатки напитков:", reply_markup=barmen_keyboard)
 
 @dp.message_handler(lambda message: message.text in barmen)
